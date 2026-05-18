@@ -1,44 +1,78 @@
 <?php
-// On inclut db.php qui gère déjà le démarrage de session
-require_once '../includes/db.php';
+// actions/auth-register.php
 
-// Sécurité : On bloque l'accès direct via URL
+if (session_status() === PHP_SESSION_NONE) session_start();
+
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/mailer.php';
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: ../register.php');
-    exit;
+    header('Location: ../register.php'); exit;
 }
 
-$first_name = trim($_POST['first_name'] ?? '');
-$last_name = trim($_POST['last_name'] ?? '');
-$email = trim($_POST['email'] ?? '');
-$phone = trim($_POST['phone'] ?? '');
-$password = $_POST['password'] ?? '';
-$role = $_POST['role'] ?? 'passenger';
+$firstName = trim($_POST['first_name'] ?? '');
+$lastName  = trim($_POST['last_name']  ?? '');
+$email     = strtolower(trim($_POST['email'] ?? ''));
+$phone     = trim($_POST['phone']      ?? '');
+$password  = $_POST['password']        ?? '';
+$role      = in_array($_POST['role'] ?? '', ['passenger','driver']) ? $_POST['role'] : 'passenger';
 
-// Validation des données
-if (empty($first_name) || empty($last_name) || empty($email) || empty($phone) || empty($password)) {
-    $_SESSION['error'] = "Veuillez remplir tous les champs.";
-    header('Location: ../register.php');
-    exit;
+// ── Validation basique ───────────────────────────────────────────────────────
+if (!$firstName || !$lastName || !$email || !$phone || !$password) {
+    $_SESSION['error'] = 'Veuillez remplir tous les champs.';
+    header('Location: ../register.php'); exit;
+}
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    $_SESSION['error'] = 'Adresse e-mail invalide.';
+    header('Location: ../register.php'); exit;
+}
+if (strlen($password) < 8) {
+    $_SESSION['error'] = 'Le mot de passe doit contenir au moins 8 caractères.';
+    header('Location: ../register.php'); exit;
 }
 
-// Hachage sécurisé du mot de passe
-$password_hash = password_hash($password, PASSWORD_BCRYPT);
+$pdo = getPDO();
 
-try {
-    $stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, phone, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$first_name, $last_name, $email, $phone, $password_hash, $role]);
-    
-    $_SESSION['success'] = "Inscription réussie ! Connectez-vous dès maintenant.";
-    header('Location: ../login.php');
-    exit;
-
-} catch (PDOException $e) {
-    if ($e->getCode() == 23000) { // Doublon unique sur l'email ou le téléphone
-        $_SESSION['error'] = "Cet email ou ce numéro de téléphone est déjà enregistré au Gabon.";
-    } else {
-        $_SESSION['error'] = "Une erreur technique est survenue.";
-    }
-    header('Location: ../register.php');
-    exit;
+// ── Vérification doublon ─────────────────────────────────────────────────────
+$stmt = $pdo->prepare('SELECT id FROM users WHERE email = ?');
+$stmt->execute([$email]);
+if ($stmt->fetch()) {
+    $_SESSION['error'] = 'Un compte existe déjà avec cet e-mail.';
+    header('Location: ../register.php'); exit;
 }
+
+// ── Insertion ────────────────────────────────────────────────────────────────
+$passwordHash  = password_hash($password, PASSWORD_BCRYPT);
+$verifyToken   = bin2hex(random_bytes(32));
+
+$pdo->prepare('
+    INSERT INTO users (first_name, last_name, email, phone, password_hash, role, verify_token)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+')->execute([$firstName, $lastName, $email, $phone, $passwordHash, $role, $verifyToken]);
+
+$userId = $pdo->lastInsertId();
+
+// Créer un profil chauffeur vide si besoin
+if ($role === 'driver') {
+    $pdo->prepare('INSERT INTO driver_profiles (user_id) VALUES (?)')->execute([$userId]);
+}
+
+// ── Envoi e-mail de vérification ─────────────────────────────────────────────
+$baseUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
+$verifyLink = $baseUrl . '/verify-email.php?token=' . $verifyToken;
+
+$sent = sendMail(
+    $email,
+    "$firstName $lastName",
+    '✅ Vérifiez votre adresse e-mail — Taxi Gabon',
+    emailVerificationTemplate("$firstName $lastName", $verifyLink)
+);
+
+if ($sent) {
+    $_SESSION['success'] = "Compte créé ! Un e-mail de vérification a été envoyé à $email.";
+} else {
+    // En dev, on peut activer directement
+    $_SESSION['success'] = "Compte créé ! Vérifiez votre boîte e-mail pour activer votre compte.";
+}
+
+header('Location: ../login.php'); exit;
