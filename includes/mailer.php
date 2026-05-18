@@ -13,7 +13,7 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
     try {
         // ── SMTP (adaptez avec votre fournisseur : Gmail, Brevo, Mailgun…) ──
         $mail->isSMTP();
-        $mail->Host       = $_ENV['MAIL_HOST']     ?? 'smtp.gmail.com';
+        $mail->Host       = $_ENV['MAIL_HOST']     ?? 'danaiyannickneil@gmail.com';
         $mail->SMTPAuth   = true;
         $mail->Username   = $_ENV['MAIL_USER']     ?? '';
         $mail->Password   = $_ENV['MAIL_PASS']     ?? '';
@@ -42,7 +42,8 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
 
 // ── Templates ────────────────────────────────────────────────────────────────
 
-function emailVerificationTemplate(string $name, string $link): string {
+function emailVerificationTemplate(string $name, string $link): string
+{
     return <<<HTML
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:30px;border:1px solid #eee;border-radius:12px;">
         <h2 style="color:#1a1a2e;text-align:center;">🚕 Taxi Gabon</h2>
@@ -58,7 +59,8 @@ function emailVerificationTemplate(string $name, string $link): string {
     HTML;
 }
 
-function passwordResetTemplate(string $name, string $code): string {
+function passwordResetTemplate(string $name, string $code): string
+{
     return <<<HTML
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:30px;border:1px solid #eee;border-radius:12px;">
         <h2 style="color:#1a1a2e;text-align:center;">🚕 Taxi Gabon</h2>

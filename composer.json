@@ -1,0 +1,7 @@
+{
+    "name": "taxi-gabon/app",
+    "require": {
+        "php": ">=8.1",
+        "phpmailer/phpmailer": "^6.9"
+    }
+}
