@@ -13,7 +13,7 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE vehicles (
+CREATE TABLE vehucles (
     id INT AUTO_INCREMENT PRIMARY KEY,
     driver_id INT NOT NULL,
     make VARCHAR(50) NOT NULL,
