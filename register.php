@@ -1,4 +1,9 @@
-<?php require_once 'includes/header.php'; ?>
+<?php 
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+require_once 'includes/header.php'; 
+?>
 
 <div class="container">
     <div class="auth-container">
@@ -7,8 +12,17 @@
             <h2 class="auth-title mb-0">Créer un compte</h2>
             <p class="text-muted mt-2">Rejoignez la communauté Taxi Gabon</p>
         </div>
+
+        <?php if (isset($_SESSION['error'])): ?>
+            <div class="alert alert-danger text-center small rounded-3 py-2"><?= htmlspecialchars($_SESSION['error']) ?></div>
+            <?php unset($_SESSION['error']); ?>
+        <?php endif; ?>
+        <?php if (isset($_SESSION['success'])): ?>
+            <div class="alert alert-success text-center small rounded-3 py-2"><?= htmlspecialchars($_SESSION['success']) ?></div>
+            <?php unset($_SESSION['success']); ?>
+        <?php endif; ?>
         
-        <form action="#" method="POST">
+        <form action="actions/auth-register.php" method="POST">
             <div class="row mb-3">
                 <div class="col-sm-6 mb-3 mb-sm-0">
                     <label class="form-label fw-bold">Prénom</label>
