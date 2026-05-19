@@ -217,7 +217,7 @@ $totalRides = $totalStmt->fetchColumn();
                         <button class="btn btn-light border w-100 rounded-pill text-dark fw-medium btn-sm py-2" onclick="useMyLocation()">
                             <i class="fa-solid fa-crosshairs text-primary me-2"></i>Utiliser ma position actuelle
                         </button>
-                        <button class="btn btn-primary w-100 fw-bold rounded-pill py-2.5 mt-2 text-dark shadow-sm" style="background-color:#ffd700; border-color:#ffd700;" onclick="estimateRide()">
+                        <button class="btn btn-primary w-100 fw-bold rounded-pill py-2 mt-2 text-dark shadow-sm" style="background-color:#ffd700; border-color:#ffd700;" onclick="estimateRide()">
                             Calculer l'itinéraire & le prix
                         </button>
                     </div>
@@ -433,9 +433,53 @@ $totalRides = $totalStmt->fetchColumn();
         document.getElementById('step1').classList.remove('d-none');
     }
 
+    // ── CARTE DE SUIVI — Course active ───────────────────────────────────────────
+    <?php if ($activeRide && $activeRide['driver_lat'] && $activeRide['driver_lng']): ?>
+            (function initTrackMap() {
+                const driverLat = <?= (float)$activeRide['driver_lat'] ?>;
+                const driverLng = <?= (float)$activeRide['driver_lng'] ?>;
+                const destLat = <?= (float)$activeRide['dest_lat'] ?>;
+                const destLng = <?= (float)$activeRide['dest_lng'] ?>;
+
+                trackMap = L.map('trackMap').setView([driverLat, driverLng], 14);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap'
+                }).addTo(trackMap);
+
+                const taxiIcon = L.divIcon({
+                    html: '<div style="background:#ffd700;border:3px solid #1a1a2e;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;">🚕</div>',
+                    className: '',
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16]
+                });
+                L.marker([driverLat, driverLng], {
+                    icon: taxiIcon
+                }).addTo(trackMap).bindPopup('Votre chauffeur');
+                L.marker([destLat, destLng]).addTo(trackMap).bindPopup('Destination');
+
+                // Polling toutes les 10 s pour actualiser la position du chauffeur
+                let taxiMarker = null;
+                setInterval(() => {
+                    fetch('api/driver-position.php?ride_id=<?= (int)$activeRide['id'] ?>')
+                        .then(r => r.json())
+                        .then(pos => {
+                            if (!pos.lat || !pos.lng) return;
+                            if (!taxiMarker) {
+                                taxiMarker = L.marker([pos.lat, pos.lng], {
+                                    icon: taxiIcon
+                                }).addTo(trackMap);
+                            } else {
+                                taxiMarker.setLatLng([pos.lat, pos.lng]);
+                            }
+                            trackMap.setView([pos.lat, pos.lng]);
+                        }).catch(() => {});
+                }, 10000);
+            })();
+    <?php endif; ?>
+
     function confirmRide() {
         if (!rideEstimate.price_fcfa) return;
-        fetch('api/create-ride.php', {
+        fetch('api/book-ride.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

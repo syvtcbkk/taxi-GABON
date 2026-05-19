@@ -1,8 +1,8 @@
-<?php 
+<?php
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
-require_once 'includes/header.php'; 
+require_once 'includes/header.php';
 ?>
 
 <div class="container">
@@ -21,7 +21,7 @@ require_once 'includes/header.php';
             <div class="alert alert-success text-center small rounded-3 py-2"><?= htmlspecialchars($_SESSION['success']) ?></div>
             <?php unset($_SESSION['success']); ?>
         <?php endif; ?>
-        
+
         <form action="actions/auth-login.php" method="POST">
             <div class="mb-3">
                 <label class="form-label fw-bold">Email ou Téléphone</label>
@@ -33,7 +33,7 @@ require_once 'includes/header.php';
             <div class="mb-4">
                 <label class="form-label fw-bold d-flex justify-content-between">
                     <span>Mot de passe</span>
-                    <a href="#" class="text-decoration-none text-muted small fw-normal">Mot de passe oublié ?</a>
+                    <a href="forgot-password.php" class="text-decoration-none text-muted small fw-normal">Mot de passe oublié ?</a>
                 </label>
                 <div class="input-group">
                     <span class="input-group-text bg-light"><i class="fa-solid fa-lock"></i></span>
@@ -45,7 +45,7 @@ require_once 'includes/header.php';
                 <label class="form-check-label text-muted" for="rememberMe">Se souvenir de moi</label>
             </div>
             <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold rounded-pill">Se connecter</button>
-            
+
             <div class="text-center mt-4 pt-3 border-top">
                 <p class="mb-0 text-muted">Pas encore de compte ? <a href="register.php" class="text-decoration-none fw-bold text-dark">Inscrivez-vous</a></p>
             </div>

@@ -98,9 +98,9 @@ $profile = $profileStmt->fetch();
                 Espace Chauffeur — <?= htmlspecialchars($_SESSION['user_name']) ?> 🚕
             </h2>
             <div class="d-flex align-items-center mt-2 flex-wrap gap-2">
-                <span class="badge <?= $profile['is_available'] ? 'bg-success' : 'bg-secondary' ?> px-3 py-2 rounded-pill" id="statusBadge">
-                    <i class="fa-solid <?= $profile['is_available'] ? 'fa-circle-check' : 'fa-circle-xmark' ?> me-1"></i>
-                    <?= $profile['is_available'] ? 'En ligne' : 'Hors ligne' ?>
+                <span class="badge <?= !empty($profile['is_available']) ? 'bg-success' : 'bg-secondary' ?> px-3 py-2 rounded-pill" id="statusBadge">
+                    <i class="fa-solid <?= !empty($profile['is_available']) ? 'fa-circle-check' : 'fa-circle-xmark' ?> me-1"></i>
+                    <?= !empty($profile['is_available']) ? 'En ligne' : 'Hors ligne' ?>
                 </span>
                 <?php if ($profile && $profile['plate_number']): ?>
                     <span class="text-muted ms-2">
@@ -115,7 +115,7 @@ $profile = $profileStmt->fetch();
             <div class="bg-light p-3 rounded-4 d-inline-block shadow-sm">
                 <div class="form-check form-switch d-flex align-items-center mb-0 px-5">
                     <input class="form-check-input fs-4 cursor-pointer" type="checkbox" role="switch"
-                        id="statusSwitch" <?= $profile['is_available'] ? 'checked' : '' ?>>
+                        id="statusSwitch" <?= !empty($profile['is_available']) ? 'checked' : '' ?>>
                     <label class="form-check-label ms-3 fw-bold text-dark cursor-pointer" for="statusSwitch">Disponible</label>
                 </div>
             </div>
