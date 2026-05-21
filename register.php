@@ -2,6 +2,14 @@
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
+if (isset($_SESSION['user_id'], $_SESSION['user_role'])) {
+    if ($_SESSION['user_role'] === 'driver') {
+        header('Location: dashboard-driver.php');
+        exit;
+    }
+    header('Location: dashboard-passenger.php');
+    exit;
+}
 require_once 'includes/header.php'; 
 ?>
 

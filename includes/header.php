@@ -1,5 +1,6 @@
 <?php 
 // Sécurisation du chemin d'inclusion de la base de données
+if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/db.php'; 
 ?>
 <!DOCTYPE html>
@@ -26,12 +27,12 @@ require_once __DIR__ . '/db.php';
                     <li class="nav-item"><a class="nav-link" href="index.php#services">Services</a></li>
                     
                     <?php if (isset($_SESSION['user_id'])): ?>
-                        <?php if ($_SESSION['role'] === 'driver'): ?>
+                       <?php if (($_SESSION['user_role'] ?? $_SESSION['role'] ?? '') === 'driver'): ?>
                             <li class="nav-item"><a class="nav-link text-warning fw-bold" href="dashboard-driver.php">Mon Espace Chauffeur</a></li>
                         <?php else: ?>
                             <li class="nav-item"><a class="nav-link text-warning fw-bold" href="dashboard-passenger.php">Mon Espace Passager</a></li>
                         <?php endif; ?>
-                        <li class="nav-item"><a class="nav-link btn btn-outline-danger ms-2 px-3 text-white border-danger" href="actions/logout.php">Déconnexion</a></li>
+                        <li class="nav-item"><a class="nav-link btn btn-outline-danger ms-2 px-3 text-white border-danger" href="logout.php">Déconnexion</a></li>
                     <?php else: ?>
                         <li class="nav-item"><a class="nav-link btn btn-outline-light ms-2 px-3" href="login.php">Connexion</a></li>
                         <li class="nav-item"><a class="nav-link btn btn-primary text-dark ms-2 px-3 fw-bold" href="register.php">Inscription</a></li>

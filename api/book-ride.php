@@ -4,15 +4,20 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../includes/db.php';
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'passenger') {
-    echo json_encode(['success' => false, 'message' => 'Non autorisé']); exit;
+$sessionRole = $_SESSION['user_role'] ?? $_SESSION['role'] ?? null;
+if (!isset($_SESSION['user_id']) || $sessionRole !== 'passenger') {
+    $error = 'Non autorisé';
+    if (isset($_SESSION['user_id']) && $sessionRole !== 'passenger') {
+        $error = 'Vous devez être connecté en tant que passager.';
+    }
+    echo json_encode(['success' => false, 'error' => $error, 'session_role' => $sessionRole]); exit;
 }
 $body = json_decode(file_get_contents('php://input'), true);
 
 $required = ['origin_address','origin_lat','origin_lng','dest_address','dest_lat','dest_lng','distance_km','duration_min','price_fcfa'];
 foreach ($required as $k) {
     if (empty($body[$k]) && $body[$k] !== 0) {
-        echo json_encode(['success' => false, 'message' => "Champ manquant : $k"]); exit;
+        echo json_encode(['success' => false, 'error' => "Champ manquant : $k"]); exit;
     }
 }
 

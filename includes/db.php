@@ -1,30 +1,41 @@
 <?php
-// includes/db.php — Connexion PDO centralisée
+// includes/db.php
 
-$envPath = __DIR__ . '/../.env';
-if (file_exists($envPath)) {
-    foreach (file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
-        if (str_starts_with(trim($line), '#')) continue;
-        [$key, $val] = array_map('trim', explode('=', $line, 2));
-        $_ENV[$key] = $val;
+// Chargement des variables d'environnement si tu utilises un fichier .env
+if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+    if (class_exists('Dotenv\Dotenv')) {
+        $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
+        $dotenv->safeLoad();
     }
 }
 
-function getPDO(): PDO {
-    static $pdo = null;
-    if ($pdo) return $pdo;
+// Variables de connexion de secours ou basées sur ton fichier .env (vu dans ton VS Code)
+$host    = $_ENV['DB_HOST']     ?? 'localhost';
+$dbname  = $_ENV['DB_NAME']     ?? 'taxi_gabon';
+$user    = $_ENV['DB_USER']     ?? 'root';
+$pass    = $_ENV['DB_PASSWORD'] ?? '';
+$charset = $_ENV['DB_CHARSET']  ?? 'utf8mb4';
 
-    $host    = $_ENV['DB_HOST']    ?? 'localhost';
-    $db      = $_ENV['DB_NAME']    ?? 'taxi_gabon';
-    $user    = $_ENV['DB_USER']    ?? 'root';
-    $pass    = $_ENV['DB_PASSWORD'] ?? '';
-    $charset = $_ENV['DB_CHARSET'] ?? 'utf8mb4';
+$dsn = "mysql:host=$host;dbname=$dbname;charset=$charset";
+$options = [
+    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES   => false,
+];
 
-    $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
-    $pdo = new PDO($dsn, $user, $pass, [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES   => false,
-    ]);
+try {
+    // On initialise la variable GLOBALE $pdo
+    $pdo = new PDO($dsn, $user, $pass, $options);
+} catch (\PDOException $e) {
+    die("Erreur de connexion à la base de données : " . $e->getMessage());
+}
+
+function getPDO()
+{
+    global $pdo;
+    if (!isset($pdo)) {
+        throw new RuntimeException('Connexion PDO non initialisée.');
+    }
     return $pdo;
 }

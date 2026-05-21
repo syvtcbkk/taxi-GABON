@@ -1,7 +1,12 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
-if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'passenger') {
+if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
+    exit;
+}
+$sessionRole = $_SESSION['user_role'] ?? $_SESSION['role'] ?? null;
+if ($sessionRole !== 'passenger') {
+    header('Location: dashboard-driver.php');
     exit;
 }
 require_once 'includes/db.php';
@@ -40,6 +45,11 @@ $history = $histStmt->fetchAll();
 $totalStmt = $pdo->prepare('SELECT COUNT(*) FROM rides WHERE passenger_id = ? AND status = "completed"');
 $totalStmt->execute([$userId]);
 $totalRides = $totalStmt->fetchColumn();
+
+// ── Demande en attente (pour les passagers) ───────────────────────────────────
+$pendingStmt = $pdo->prepare('SELECT * FROM rides WHERE passenger_id = ? AND status = "pending" ORDER BY created_at DESC LIMIT 1');
+$pendingStmt->execute([$userId]);
+$pendingRide = $pendingStmt->fetch();
 ?>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -89,6 +99,28 @@ $totalRides = $totalStmt->fetchColumn();
         </div>
     </div>
 
+    <?php if ($pendingRide): ?>
+    <div class="row g-4 mb-5">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm rounded-4 h-100 bg-white border-start border-warning border-4">
+                <div class="card-body p-4">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+                        <div>
+                            <span class="badge bg-warning text-dark rounded-pill px-3 py-2">En attente d'un chauffeur</span>
+                            <h5 class="fw-bold mt-3 mb-2"><?= htmlspecialchars($pendingRide['origin_address']) ?> → <?= htmlspecialchars($pendingRide['dest_address']) ?></h5>
+                            <p class="text-muted mb-1">Distance estimée : <strong><?= htmlspecialchars($pendingRide['distance_km']) ?> km</strong></p>
+                            <p class="text-muted mb-0">Durée estimée : <strong>~<?= htmlspecialchars($pendingRide['duration_min']) ?> min</strong></p>
+                        </div>
+                        <div class="text-md-end">
+                            <div class="fw-bold fs-4 text-success mb-2 price-badge"><?= number_format($pendingRide['price_fcfa'], 0, '.', ' ') ?> FCFA</div>
+                            <small class="text-muted">Nous cherchons un chauffeur disponible pour vous.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
     <div class="row g-4 mb-5">
         <div class="col-md-4">
             <div class="card border-0 shadow-sm rounded-4 h-100 bg-white">
@@ -120,7 +152,7 @@ $totalRides = $totalStmt->fetchColumn();
                             </div>
                             <div class="text-end">
                                 <span class="text-muted small d-block">Prix fixé :</span>
-                                <span class="fw-bold fs-4 text-success"><?= number_format($activeRide['price_fcfa'], 0, '.', ' ') ?> <small class="fs-6">FCFA</small></span>
+                                <span class="fw-bold fs-4 text-success price-badge"><?= number_format($activeRide['price_fcfa'], 0, '.', ' ') ?> <small class="fs-6">FCFA</small></span>
                             </div>
                         </div>
                         <div id="trackMap" style="height:220px; border-radius:.75rem;" class="shadow-inner mt-2"></div>
@@ -214,10 +246,10 @@ $totalRides = $totalStmt->fetchColumn();
                     <div id="bookMap" style="height:250px; border-radius:.75rem;" class="mb-3 border shadow-sm"></div>
 
                     <div class="d-flex flex-column gap-2">
-                        <button class="btn btn-light border w-100 rounded-pill text-dark fw-medium btn-sm py-2" onclick="useMyLocation()">
+                        <button class="btn btn-outline-secondary border w-100 rounded-pill text-dark fw-medium btn-sm py-2" onclick="useMyLocation()">
                             <i class="fa-solid fa-crosshairs text-primary me-2"></i>Utiliser ma position actuelle
                         </button>
-                        <button class="btn btn-primary w-100 fw-bold rounded-pill py-2 mt-2 text-dark shadow-sm" style="background-color:#ffd700; border-color:#ffd700;" onclick="estimateRide()">
+                        <button class="btn btn-outline-secondary w-100 fw-bold rounded-pill py-2 mt-2 text-dark shadow-sm" onclick="estimateRide()">
                             Calculer l'itinéraire & le prix
                         </button>
                     </div>
@@ -243,7 +275,7 @@ $totalRides = $totalStmt->fetchColumn();
                     <div id="routeMap" style="height:250px; border-radius:.75rem;" class="mb-4 border"></div>
                     <div class="d-flex gap-3">
                         <button class="btn btn-outline-secondary fw-bold rounded-pill flex-grow-1 py-2" onclick="backToStep1()">Modifier</button>
-                        <button class="btn btn-success fw-bold rounded-pill flex-grow-1 py-2 text-white shadow-sm" onclick="confirmRide()">Confirmer & Commander</button>
+                        <button class="btn btn-primary fw-bold rounded-pill flex-grow-1 py-2 text-dark shadow-sm" onclick="confirmRide()">Confirmer & Commander</button>
                     </div>
                 </div>
             </div>
@@ -481,6 +513,8 @@ $totalRides = $totalStmt->fetchColumn();
         if (!rideEstimate.price_fcfa) return;
         fetch('api/book-ride.php', {
                 method: 'POST',
+                mode: 'same-origin',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json'
                 },

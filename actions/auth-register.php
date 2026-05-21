@@ -1,14 +1,14 @@
 <?php
 // actions/auth-register.php
-
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 require_once __DIR__ . '/../includes/db.php';
-require_once __DIR__ . '/../includes/mailer.php';
+if (file_exists(__DIR__ . '/../includes/mailer.php')) {
+    require_once __DIR__ . '/../includes/mailer.php';
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: ../register.php');
-    exit;
+    header('Location: ../register.php'); exit;
 }
 
 $firstName = trim($_POST['first_name'] ?? '');
@@ -18,70 +18,62 @@ $phone     = trim($_POST['phone']      ?? '');
 $password  = $_POST['password']        ?? '';
 $role      = in_array($_POST['role'] ?? '', ['passenger', 'driver']) ? $_POST['role'] : 'passenger';
 
-// ── Validation basique ───────────────────────────────────────────────────────
 if (!$firstName || !$lastName || !$email || !$phone || !$password) {
     $_SESSION['error'] = 'Veuillez remplir tous les champs.';
-    header('Location: ../register.php');
+    header('Location: ../register.php'); exit;
+}
+
+if (!isset($pdo)) {
+    die("Erreur de configuration : La variable \$pdo n'est pas disponible.");
+}
+
+try {
+    // Vérification si l'email existe déjà
+    $stmt = $pdo->prepare('SELECT id FROM users WHERE email = ? OR phone = ?');
+    $stmt->execute([$email, $phone]);
+    if ($stmt->fetch()) {
+        $_SESSION['error'] = 'Cet e-mail ou ce numéro de téléphone est déjà enregistré au Gabon.';
+        header('Location: ../register.php'); exit;
+    }
+
+    // Préparation des données de hachage et du code de test
+    $passwordHash = password_hash($password, PASSWORD_BCRYPT);
+    $verifyCode   = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+    $verifyExpires = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+
+    // Mode développeur : on active d'office le compte sur localhost (is_verified = 1)
+    $isVerifiedLocal = ($_SERVER['HTTP_HOST'] === 'localhost' || $_SERVER['HTTP_HOST'] === '127.0.0.1') ? 1 : 0;
+
+    // CORRECTION CRITIQUE : Plus aucune mention de verify_token ici !
+    $insert = $pdo->prepare('
+        INSERT INTO users (first_name, last_name, email, phone, password_hash, role, reset_code, reset_expires, is_verified)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ');
+    $insert->execute([$firstName, $lastName, $email, $phone, $passwordHash, $role, $verifyCode, $verifyExpires, $isVerifiedLocal]);
+
+    $userId = $pdo->lastInsertId();
+
+    if ($role === 'driver') {
+        $pdo->prepare('INSERT INTO driver_profiles (user_id) VALUES (?)')->execute([$userId]);
+    }
+
+    // Tentative d'envoi du mail de courtoisie
+    if (function_exists('sendMail') && function_exists('passwordResetTemplate')) {
+        @sendMail(
+            $email,
+            "$firstName $lastName",
+            '🔑 Votre code de vérification — Taxi Gabon',
+            passwordResetTemplate("$firstName $lastName", $verifyCode)
+        );
+    }
+
+    $_SESSION['verify_email'] = $email;
+    $_SESSION['success'] = "Mode Développeur : Compte activé ! Le code généré pour ton test d'interface est : $verifyCode";
+
+    header('Location: ../verify-code.php');
     exit;
+
+} catch (PDOException $e) {
+    $_SESSION['error'] = "Erreur technique d'insertion : " . $e->getMessage();
+    header('Location: ../register.php'); exit;
 }
-if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    $_SESSION['error'] = 'Adresse e-mail invalide.';
-    header('Location: ../register.php');
-    exit;
-}
-if (strlen($password) < 8) {
-    $_SESSION['error'] = 'Le mot de passe doit contenir au moins 8 caractères.';
-    header('Location: ../register.php');
-    exit;
-}
-
-$pdo = getPDO();
-
-// ── Vérification doublon ─────────────────────────────────────────────────────
-$stmt = $pdo->prepare('SELECT id FROM users WHERE email = ?');
-$stmt->execute([$email]);
-if ($stmt->fetch()) {
-    $_SESSION['error'] = 'Un compte existe déjà avec cet e-mail.';
-    header('Location: ../register.php');
-    exit;
-}
-
-// ── Insertion ────────────────────────────────────────────────────────────────
-$passwordHash  = password_hash($password, PASSWORD_BCRYPT);
-$verifyToken   = bin2hex(random_bytes(32));
-
-$pdo->prepare('
-    INSERT INTO users (first_name, last_name, email, phone, password_hash, role, verify_token)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-')->execute([$firstName, $lastName, $email, $phone, $passwordHash, $role, $verifyToken]);
-
-$userId = $pdo->lastInsertId();
-
-// Créer un profil chauffeur vide si besoin
-if ($role === 'driver') {
-    $pdo->prepare('INSERT INTO driver_profiles (user_id) VALUES (?)')->execute([$userId]);
-}
-
-// ── Envoi e-mail de vérification ─────────────────────────────────────────────
-// Détecte proprement si le projet est dans un sous-dossier (ex: /taxi-GABON)
-$projectDir = str_replace('/actions', '', dirname($_SERVER['SCRIPT_NAME']));
-$baseUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . $projectDir;
-
-// Génère le lien de vérification final propre
-$verifyLink = rtrim($baseUrl, '/') . '/verify-email.php?token=' . $verifyToken;
-
-$sent = sendMail(
-    $email,
-    "$firstName $lastName",
-    '✅ Vérifiez votre adresse e-mail — Taxi Gabon',
-    emailVerificationTemplate("$firstName $lastName", $verifyLink)
-);
-
-if ($sent) {
-    $_SESSION['success'] = "Compte créé ! Un e-mail de vérification a été envoyé à $email.";
-} else {
-    $_SESSION['success'] = "Compte créé ! Vérifiez votre boîte e-mail pour activer votre compte.";
-}
-
-header('Location: ../login.php');
-exit;
