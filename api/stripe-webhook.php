@@ -3,6 +3,7 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/payments.php';
+require_once __DIR__ . '/../includes/validators.php';
 
 // Lire le payload brut
 $payload = @file_get_contents('php://input');
@@ -76,12 +77,34 @@ try {
                     exit;
                 }
             }
-            // Vérification minimale
-            $required = ['passenger_id','origin_address','origin_lat','origin_lng','dest_address','dest_lat','dest_lng','price_fcfa'];
-            foreach ($required as $k) if (empty($meta[$k])) {
-                // ignore if data manquante
+            // Vérification minimale des métadonnées
+            $required_meta = ['passenger_id','origin_address','origin_lat','origin_lng','dest_address','dest_lat','dest_lng','price_fcfa'];
+            foreach ($required_meta as $k) {
+                if (empty($meta[$k])) {
+                    http_response_code(200);
+                    echo json_encode(['status' => 'ignored', 'reason' => 'metadata_incomplete']);
+                    exit;
+                }
+            }
+
+            // Valider les métadonnées avant utilisation
+            $passengerId = (int)($meta['passenger_id'] ?? 0);
+            $originLat = (float)($meta['origin_lat'] ?? 0);
+            $originLng = (float)($meta['origin_lng'] ?? 0);
+            $destLat = (float)($meta['dest_lat'] ?? 0);
+            $destLng = (float)($meta['dest_lng'] ?? 0);
+            $price = (int)($meta['price_fcfa'] ?? 0);
+
+            if ($passengerId <= 0 || $price <= 0 || $price > 10000000) {
                 http_response_code(200);
-                echo json_encode(['status' => 'ignored', 'reason' => 'metadata_missing']);
+                echo json_encode(['status' => 'ignored', 'reason' => 'invalid_metadata']);
+                exit;
+            }
+
+            if (!($originLat >= -90 && $originLat <= 90 && $originLng >= -180 && $originLng <= 180 &&
+                  $destLat >= -90 && $destLat <= 90 && $destLng >= -180 && $destLng <= 180)) {
+                http_response_code(200);
+                echo json_encode(['status' => 'ignored', 'reason' => 'invalid_coordinates']);
                 exit;
             }
 
@@ -102,10 +125,17 @@ try {
             // Insérer la course (avec linkage stripe_session_id)
             $stmt = $pdo->prepare('INSERT INTO rides (passenger_id, origin_address, origin_lat, origin_lng, dest_address, dest_lat, dest_lng, distance_km, duration_min, price_fcfa, status, stripe_session_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "pending", ?, NOW())');
             $stmt->execute([
-                (int)$meta['passenger_id'],
-                $meta['origin_address'], $meta['origin_lat'], $meta['origin_lng'],
-                $meta['dest_address'], $meta['dest_lat'], $meta['dest_lng'],
-                $meta['distance_km'] ?? null, $meta['duration_min'] ?? null, (int)$meta['price_fcfa'], $session_id
+                $passengerId,
+                sanitizeString($meta['origin_address']),
+                $originLat,
+                $originLng,
+                sanitizeString($meta['dest_address']),
+                $destLat,
+                $destLng,
+                (float)($meta['distance_km'] ?? 0),
+                (int)($meta['duration_min'] ?? 0),
+                $price,
+                $session_id
             ]);
             $rideId = $pdo->lastInsertId();
 

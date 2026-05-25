@@ -3,6 +3,8 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/validators.php';
+
 if (file_exists(__DIR__ . '/../includes/mailer.php')) {
     require_once __DIR__ . '/../includes/mailer.php';
 }
@@ -31,6 +33,21 @@ if (!$firstName || !$lastName || !$email || !$phone || !$password) {
     header('Location: ../register.php'); exit;
 }
 
+if (!validateEmail($email)) {
+    $_SESSION['error'] = 'Adresse email invalide.';
+    header('Location: ../register.php'); exit;
+}
+
+if (!validatePhone($phone)) {
+    $_SESSION['error'] = 'Numéro de téléphone invalide.';
+    header('Location: ../register.php'); exit;
+}
+
+if (strlen($password) < 8) {
+    $_SESSION['error'] = 'Le mot de passe doit contenir au moins 8 caractères.';
+    header('Location: ../register.php'); exit;
+}
+
 if (!isset($pdo)) {
     die("Erreur de configuration : La variable \$pdo n'est pas disponible.");
 }
@@ -49,15 +66,26 @@ try {
     $verifyCode   = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
     $verifyExpires = date('Y-m-d H:i:s', strtotime('+15 minutes'));
 
-    // Mode développeur : on active d'office le compte sur localhost (is_verified = 1)
-    $isVerifiedLocal = ($_SERVER['HTTP_HOST'] === 'localhost' || $_SERVER['HTTP_HOST'] === '127.0.0.1') ? 1 : 0;
+    // Mode développeur : on activate d'office le compte si DEV_MODE=true (is_verified = 1)
+    $devMode = ($_ENV['DEV_MODE'] ?? 'false') === 'true';
+    $isVerifiedLocal = ($devMode && (in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1'], true))) ? 1 : 0;
 
     // CORRECTION CRITIQUE : Plus aucune mention de verify_token ici !
     $insert = $pdo->prepare('
         INSERT INTO users (first_name, last_name, email, phone, password_hash, role, reset_code, reset_expires, is_verified)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ');
-    $insert->execute([$firstName, $lastName, $email, $phone, $passwordHash, $role, $verifyCode, $verifyExpires, $isVerifiedLocal]);
+    $insert->execute([
+        sanitizeString($firstName),
+        sanitizeString($lastName),
+        $email,
+        $phone,
+        $passwordHash,
+        $role,
+        $verifyCode,
+        $verifyExpires,
+        $isVerifiedLocal
+    ]);
 
     $userId = $pdo->lastInsertId();
 
@@ -67,12 +95,16 @@ try {
 
     // Tentative d'envoi du mail de courtoisie
     if (function_exists('sendMail') && function_exists('passwordResetTemplate')) {
-        @sendMail(
-            $email,
-            "$firstName $lastName",
-            '🔑 Votre code de vérification — Taxi Gabon',
-            passwordResetTemplate("$firstName $lastName", $verifyCode)
-        );
+        try {
+            sendMail(
+                $email,
+                "$firstName $lastName",
+                '🔑 Votre code de vérification — Taxi Gabon',
+                passwordResetTemplate("$firstName $lastName", $verifyCode)
+            );
+        } catch (Exception $e) {
+            error_log('Email envoi échoué: ' . $e->getMessage());
+        }
     }
 
     $_SESSION['verify_email'] = $email;
