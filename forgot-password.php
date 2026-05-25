@@ -17,6 +17,7 @@ require_once 'includes/header.php';
         <?php endif; ?>
 
         <form action="actions/auth-forgot.php" method="POST">
+            <?php echo csrf_input(); ?>
             <div class="mb-4">
                 <label class="form-label fw-bold">Adresse e-mail</label>
                 <div class="input-group">

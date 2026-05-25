@@ -27,6 +27,7 @@ if (empty($_SESSION['reset_email']) && !isset($_SESSION['success'])) {
         <?php endif; ?>
 
         <form action="actions/auth-reset.php" method="POST">
+            <?php echo csrf_input(); ?>
             <!-- Saisie du code à 6 chiffres -->
             <div class="mb-4">
                 <label class="form-label fw-bold text-center d-block">Code de récupération</label>

@@ -43,10 +43,14 @@ if (!$ride) {
         </a>
         <div>
             <h4 class="fw-bold mb-0" style="color:#1a1a2e;">Course en cours</h4>
-            <small class="text-muted">Course #<?= $rideId ?></small>
+            <small class="text-muted">Course #<?= (int)$rideId ?></small>
         </div>
-        <span class="badge ms-auto px-3 py-2 rounded-pill <?= $ride['status'] === 'accepted' ? 'bg-warning text-dark' : 'bg-success text-white' ?>">
-            <?= $ride['status'] === 'accepted' ? 'En route vers le client' : 'Trajet en cours' ?>
+        <?php
+            $statusClass = ($ride['status'] === 'accepted') ? 'bg-warning text-dark' : 'bg-success text-white';
+            $statusText  = ($ride['status'] === 'accepted') ? 'En route vers le client' : 'Trajet en cours';
+        ?>
+        <span class="badge ms-auto px-3 py-2 rounded-pill <?= htmlspecialchars($statusClass, ENT_QUOTES, 'UTF-8') ?>">
+            <?= htmlspecialchars($statusText, ENT_QUOTES, 'UTF-8') ?>
         </span>
     </div>
 
@@ -87,11 +91,11 @@ if (!$ride) {
                     <hr>
                     <div class="row text-center g-2">
                         <div class="col-4">
-                            <div class="fw-bold text-dark"><?= $ride['distance_km'] ?? '—' ?> km</div>
+                            <div class="fw-bold text-dark"><?= isset($ride['distance_km']) ? htmlspecialchars($ride['distance_km'], ENT_QUOTES, 'UTF-8') : '—' ?> km</div>
                             <small class="text-muted">Distance</small>
                         </div>
                         <div class="col-4">
-                            <div class="fw-bold text-dark"><?= $ride['duration_min'] ?? '—' ?> min</div>
+                            <div class="fw-bold text-dark"><?= isset($ride['duration_min']) ? htmlspecialchars($ride['duration_min'], ENT_QUOTES, 'UTF-8') : '—' ?> min</div>
                             <small class="text-muted">Durée</small>
                         </div>
                         <div class="col-4">
@@ -169,7 +173,7 @@ if (!$ride) {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ride_id: <?= $rideId ?>, action })
+            body: JSON.stringify({ ride_id: <?= (int)$rideId ?>, action })
         })
         .then(r => r.json())
         .then(data => {

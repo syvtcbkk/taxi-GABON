@@ -31,6 +31,7 @@ require_once 'includes/header.php';
         <?php endif; ?>
         
         <form action="actions/auth-register.php" method="POST">
+            <?php echo csrf_input(); ?>
             <div class="row mb-3">
                 <div class="col-sm-6 mb-3 mb-sm-0">
                     <label class="form-label fw-bold">Prénom</label>

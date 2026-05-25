@@ -113,9 +113,14 @@ $driverHistory = $historyStmt->fetchAll();
                         <h2 class="fw-bold mb-2" style="color:#1a1a2e;">Espace Chauffeur — <?= htmlspecialchars($_SESSION['user_name']) ?> 🚕</h2>
                         <p class="mb-3 text-muted">Suivez vos gains, votre disponibilité et les nouvelles demandes en un coup d'œil.</p>
                         <div class="d-flex align-items-center flex-wrap gap-2">
-                            <span class="badge <?= !empty($profile['is_available']) ? 'bg-success' : 'bg-secondary' ?> px-3 py-2 rounded-pill" id="statusBadge">
-                                <i class="fa-solid <?= !empty($profile['is_available']) ? 'fa-circle-check' : 'fa-circle-xmark' ?> me-1"></i>
-                                <?= !empty($profile['is_available']) ? 'En ligne' : 'Hors ligne' ?>
+                            <?php
+                                $availClass = !empty($profile['is_available']) ? 'bg-success' : 'bg-secondary';
+                                $availIcon  = !empty($profile['is_available']) ? 'fa-circle-check' : 'fa-circle-xmark';
+                                $availText  = !empty($profile['is_available']) ? 'En ligne' : 'Hors ligne';
+                            ?>
+                            <span class="badge <?= htmlspecialchars($availClass, ENT_QUOTES, 'UTF-8') ?> px-3 py-2 rounded-pill" id="statusBadge">
+                                <i class="fa-solid <?= htmlspecialchars($availIcon, ENT_QUOTES, 'UTF-8') ?> me-1"></i>
+                                <?= htmlspecialchars($availText, ENT_QUOTES, 'UTF-8') ?>
                             </span>
                             <?php if ($profile && $profile['plate_number']): ?>
                                 <span class="text-muted">
@@ -276,7 +281,7 @@ $driverHistory = $historyStmt->fetchAll();
             <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
                 <div class="d-flex align-items-center gap-3">
                     <h4 class="fw-bold mb-0"><i class="fa-solid fa-bell text-warning me-2"></i>Nouvelles Demandes</h4>
-                    <span id="pendingCountBadge" class="badge bg-danger rounded-pill px-3 py-2 animate-bounce"><?= count($pending) ?> disponible(s)</span>
+                        <span id="pendingCountBadge" class="badge bg-danger rounded-pill px-3 py-2 animate-bounce"><?= (int)count($pending) ?> disponible(s)</span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <button id="refreshPendingBtn" class="btn btn-outline-secondary btn-sm fw-bold rounded-pill px-4 py-2">
@@ -297,7 +302,7 @@ $driverHistory = $historyStmt->fetchAll();
                 </div>
             <?php else: ?>
                 <?php foreach ($pending as $ride): ?>
-                    <div class="card border-0 shadow-sm rounded-4 mb-3 ride-card" id="ride-<?= $ride['id'] ?>">
+                    <div class="card border-0 shadow-sm rounded-4 mb-3 ride-card" id="ride-<?= (int)$ride['id'] ?>">
                         <div class="card-body p-4">
                             <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
                                 <div class="flex-grow-1">
@@ -316,10 +321,10 @@ $driverHistory = $historyStmt->fetchAll();
                                             <span class="text-warning fw-bold">(★ <?= number_format($ride['rating'], 1) ?>)</span>
                                         </div>
                                         <div class="col-sm-6 col-md-4">
-                                            <i class="fa-solid fa-route me-2 text-warning"></i>Distance : <strong><?= $ride['distance_km'] ?> km</strong>
+                                            <i class="fa-solid fa-route me-2 text-warning"></i>Distance : <strong><?= isset($ride['distance_km']) ? htmlspecialchars($ride['distance_km'], ENT_QUOTES, 'UTF-8') : '—' ?> km</strong>
                                         </div>
                                         <div class="col-sm-6 col-md-4">
-                                            <i class="fa-solid fa-clock me-2 text-warning"></i>Temps : <strong>~<?= $ride['duration_min'] ?> min</strong>
+                                            <i class="fa-solid fa-clock me-2 text-warning"></i>Temps : <strong>~<?= isset($ride['duration_min']) ? htmlspecialchars($ride['duration_min'], ENT_QUOTES, 'UTF-8') : '—' ?> min</strong>
                                         </div>
                                     </div>
                                 </div>
@@ -330,11 +335,11 @@ $driverHistory = $historyStmt->fetchAll();
                                     </div>
                                     <div class="d-flex flex-wrap gap-2 justify-content-end">
                                         <button class="btn btn-outline-secondary fw-bold rounded-pill px-4"
-                                            onclick="respondRide(<?= $ride['id'] ?>, 'cancel')">
+                                            onclick="respondRide(<?= (int)$ride['id'] ?>, 'cancel')">
                                             Refuser
                                         </button>
                                         <button class="btn btn-warning fw-bold rounded-pill px-4 shadow-sm text-dark"
-                                            onclick="respondRide(<?= $ride['id'] ?>, 'accept')">
+                                            onclick="respondRide(<?= (int)$ride['id'] ?>, 'accept')">
                                             Accepter
                                         </button>
                                     </div>

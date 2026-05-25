@@ -37,6 +37,7 @@ require_once 'includes/header.php';
         <?php endif; ?>
 
         <form action="actions/auth-login.php" method="POST">
+            <?php echo csrf_input(); ?>
             <div class="mb-3">
                 <label class="form-label small fw-bold text-muted">Email ou Téléphone</label>
                 <div class="input-group">

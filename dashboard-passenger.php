@@ -30,6 +30,13 @@ $activeStmt = $pdo->prepare('
 $activeStmt->execute([$userId]);
 $activeRide = $activeStmt->fetch();
 
+// Récupérer note moyenne du chauffeur pour le trajet actif
+if ($activeRide && !empty($activeRide['driver_id'])) {
+    $drv = $pdo->prepare('SELECT rating FROM users WHERE id = ?');
+    $drv->execute([(int)$activeRide['driver_id']]);
+    $activeRide['driver_rating'] = $drv->fetchColumn();
+}
+
 // ── Historique ────────────────────────────────────────────────────────────────
 $histStmt = $pdo->prepare('
     SELECT r.*, u.first_name AS driver_first, u.last_name AS driver_last
@@ -40,6 +47,20 @@ $histStmt = $pdo->prepare('
 ');
 $histStmt->execute([$userId]);
 $history = $histStmt->fetchAll();
+
+// Récupérer notes moyennes pour tous les chauffeurs dans l'historique
+$driverIds = array_values(array_unique(array_filter(array_column($history, 'driver_id'))));
+if (!empty($driverIds)) {
+    $placeholders = implode(',', array_fill(0, count($driverIds), '?'));
+    $mapStmt = $pdo->prepare("SELECT id, rating FROM users WHERE id IN ($placeholders)");
+    $mapStmt->execute($driverIds);
+    $map = [];
+    while ($r = $mapStmt->fetch(PDO::FETCH_ASSOC)) { $map[(int)$r['id']] = $r['rating']; }
+    foreach ($history as &$h) {
+        $h['driver_rating'] = $map[(int)$h['driver_id']] ?? null;
+    }
+    unset($h);
+}
 
 // ── Total courses ─────────────────────────────────────────────────────────────
 $totalStmt = $pdo->prepare('SELECT COUNT(*) FROM rides WHERE passenger_id = ? AND status = "completed"');
@@ -83,6 +104,13 @@ $pendingRide = $pendingStmt->fetch();
 </style>
 
 <div class="container py-5 mt-4">
+    <!-- Overlay de traitement / spinner -->
+    <div id="processingOverlay" style="display:none;position:fixed;inset:0;background:rgba(255,255,255,0.8);z-index:3000;align-items:center;justify-content:center;">
+        <div class="text-center">
+            <div class="spinner-border text-warning" role="status" style="width:3rem;height:3rem;"></div>
+            <div class="mt-3 fw-bold">Traitement en cours, veuillez patienter...</div>
+        </div>
+    </div>
 
     <div class="row mb-4 align-items-center">
         <div class="col-md-8">
@@ -146,7 +174,12 @@ $pendingRide = $pendingStmt->fetch();
                                     <?= htmlspecialchars($activeRide['origin_address']) ?> ➔ <?= htmlspecialchars($activeRide['dest_address']) ?>
                                 </h5>
                                 <p class="text-muted small mb-0">
-                                    Chauffeur : <strong><?= htmlspecialchars($activeRide['driver_first'] . ' ' . $activeRide['driver_last']) ?></strong>
+                                    Chauffeur : <strong><a href="#" class="open-reviews-btn text-decoration-none" data-driver="<?= (int)$activeRide['driver_id'] ?>"><?=
+                                        htmlspecialchars($activeRide['driver_first'] . ' ' . $activeRide['driver_last'])
+                                    ?></a></strong>
+                                    <?php if (!empty($activeRide['driver_rating'])): ?>
+                                        <span class="badge bg-warning text-dark ms-2"><?= number_format($activeRide['driver_rating'],1) ?>★</span>
+                                    <?php endif; ?>
                                     • <?= htmlspecialchars($activeRide['vehicle_brand'] . ' ' . $activeRide['vehicle_model']) ?> (<?= htmlspecialchars($activeRide['plate_number'] ?? '') ?>)
                                 </p>
                             </div>
@@ -201,7 +234,13 @@ $pendingRide = $pendingStmt->fetch();
                                 <td class="py-3 fw-medium text-dark"><?= htmlspecialchars($r['dest_address']) ?></td>
                                 <td class="py-3 text-muted">
                                     <i class="fa-solid fa-user-check text-success me-1"></i>
-                                    <?= htmlspecialchars($r['driver_first'] ?? '—') ?>
+                                    <a href="#" class="open-reviews-btn text-decoration-none" data-driver="<?= (int)$r['driver_id'] ?>"><?= htmlspecialchars($r['driver_first'] ?? '—') ?></a>
+                                    <?php if (!empty($r['driver_rating'])): ?>
+                                        <span class="badge bg-warning text-dark ms-2"><?= number_format($r['driver_rating'],1) ?>★</span>
+                                    <?php endif; ?>
+                                    <?php if (!empty($r['driver_id']) && (empty($r['driver_rating']) || $r['driver_rating'] === null)): ?>
+                                        <button class="btn btn-sm btn-outline-secondary ms-2 leave-review-btn" data-ride="<?= (int)$r['id'] ?>" data-driver="<?= (int)$r['driver_id'] ?>">Laisser un avis</button>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="py-3">
                                     <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1 rounded">Terminée</span>
@@ -214,6 +253,69 @@ $pendingRide = $pendingStmt->fetch();
                     <?php endif; ?>
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal d'avis -->
+<div class="modal fade" id="reviewModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4">
+            <form method="POST" action="actions/submit-review.php">
+                <?php echo csrf_input(); ?>
+                <input type="hidden" name="ride_id" id="reviewRideId" value="">
+                <div class="modal-header">
+                    <h5 class="modal-title">Laisser un avis</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Note</label>
+                        <select name="rating" id="reviewRating" class="form-select" required>
+                            <option value="5">5 — Excellent</option>
+                            <option value="4">4 — Très bien</option>
+                            <option value="3">3 — Correct</option>
+                            <option value="2">2 — Médiocre</option>
+                            <option value="1">1 — Mauvais</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Commentaire (optionnel)</label>
+                        <textarea name="comment" class="form-control" rows="4"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Envoyer l'avis</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: liste des avis -->
+<div class="modal fade" id="reviewsListModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content rounded-4">
+            <div class="modal-header">
+                <h5 class="modal-title">Avis</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="reviewsLoader" class="text-center py-4">
+                    <div class="spinner-border text-warning" role="status"></div>
+                </div>
+                <div id="reviewsContent" style="display:none;">
+                    <div class="mb-3">
+                        <strong>Moyenne: </strong> <span id="avgRating">—</span>
+                        <small class="text-muted">(<span id="reviewsCount">0</span> avis)</small>
+                    </div>
+                    <div id="reviewsList" class="list-group"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fermer</button>
+            </div>
         </div>
     </div>
 </div>
@@ -489,48 +591,124 @@ $pendingRide = $pendingStmt->fetch();
                 }).addTo(trackMap).bindPopup('Votre chauffeur');
                 L.marker([destLat, destLng]).addTo(trackMap).bindPopup('Destination');
 
-                // Polling toutes les 10 s pour actualiser la position du chauffeur
+                // Remplacement du polling par SSE (EventSource) pour mises à jour temps réel
                 let taxiMarker = null;
-                setInterval(() => {
-                    fetch('api/driver-position.php?ride_id=<?= (int)$activeRide['id'] ?>')
-                        .then(r => r.json())
-                        .then(pos => {
-                            if (!pos.lat || !pos.lng) return;
+                const driverId = <?= isset($activeRide['driver_id']) ? (int)$activeRide['driver_id'] : 0 ?>;
+
+                // Connexion SSE
+                try {
+                    const es = new EventSource('api/stream-positions.php');
+                    es.addEventListener('positions', e => {
+                        try {
+                            const data = JSON.parse(e.data || '[]');
+                            const pos = (data || []).find(p => Number(p.user_id) === Number(driverId));
+                            if (!pos || !pos.lat || !pos.lng) return;
                             if (!taxiMarker) {
-                                taxiMarker = L.marker([pos.lat, pos.lng], {
-                                    icon: taxiIcon
-                                }).addTo(trackMap);
+                                taxiMarker = L.marker([pos.lat, pos.lng], { icon: taxiIcon }).addTo(trackMap);
                             } else {
                                 taxiMarker.setLatLng([pos.lat, pos.lng]);
                             }
                             trackMap.setView([pos.lat, pos.lng]);
-                        }).catch(() => {});
-                }, 10000);
+                        } catch (err) { /* ignore parse errors */ }
+                    });
+                } catch (err) {
+                    // Fallback sur polling toutes les 10s si EventSource non supporté
+                    setInterval(() => {
+                        fetch('api/driver-position.php?driver_id=' + driverId)
+                            .then(r => r.json())
+                            .then(pos => {
+                                if (!pos.lat || !pos.lng) return;
+                                if (!taxiMarker) {
+                                    taxiMarker = L.marker([pos.lat, pos.lng], { icon: taxiIcon }).addTo(trackMap);
+                                } else {
+                                    taxiMarker.setLatLng([pos.lat, pos.lng]);
+                                }
+                                trackMap.setView([pos.lat, pos.lng]);
+                            }).catch(() => {});
+                    }, 10000);
+                }
             })();
     <?php endif; ?>
 
     function confirmRide() {
         if (!rideEstimate.price_fcfa) return;
-        fetch('api/book-ride.php', {
+        // Afficher overlay et désactiver boutons
+        const overlay = document.getElementById('processingOverlay');
+        overlay.style.display = 'flex';
+        // Démarrer le flux de paiement (Stripe Checkout)
+        fetch('api/create-checkout-session.php', {
                 method: 'POST',
                 mode: 'same-origin',
                 credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(rideEstimate)
             })
             .then(r => r.json())
             .then(data => {
-                if (data.success) {
-                    alert('Votre demande de taxi a été envoyée aux chauffeurs aux alentours !');
-                    window.location.reload();
+                if (data.success && data.url) {
+                    // Rediriger vers Stripe Checkout
+                    window.location.href = data.url;
                 } else {
-                    alert(data.error || 'Erreur lors de la réservation.');
+                    overlay.style.display = 'none';
+                    alert(data.error || 'Erreur lors de la création de la session de paiement.');
                 }
-            })
-            .catch(() => alert('Erreur réseau.'));
+            }).catch(() => { overlay.style.display = 'none'; alert('Erreur réseau.'); });
     }
+
+    // Review modal handling
+    document.addEventListener('click', function (e) {
+        if (e.target && e.target.matches('.leave-review-btn')) {
+            var ride = e.target.getAttribute('data-ride');
+            var driver = e.target.getAttribute('data-driver');
+            var input = document.getElementById('reviewRideId');
+            input.value = ride;
+            var modal = new bootstrap.Modal(document.getElementById('reviewModal'));
+            modal.show();
+        }
+        if (e.target && e.target.matches('.open-reviews-btn')) {
+            e.preventDefault();
+            var driverId = parseInt(e.target.getAttribute('data-driver')) || 0;
+            if (!driverId) return;
+            var modalEl = document.getElementById('reviewsListModal');
+            var modal = new bootstrap.Modal(modalEl);
+            // reset
+            document.getElementById('reviewsContent').style.display = 'none';
+            document.getElementById('reviewsLoader').style.display = 'block';
+            document.getElementById('reviewsList').innerHTML = '';
+            document.getElementById('avgRating').textContent = '—';
+            document.getElementById('reviewsCount').textContent = '0';
+            modal.show();
+            fetch('api/get-reviews.php?driver_id=' + driverId)
+                .then(r => r.json())
+                .then(json => {
+                    document.getElementById('reviewsLoader').style.display = 'none';
+                    if (!json.success) {
+                        document.getElementById('reviewsContent').innerHTML = '<div class="text-danger">Erreur lors du chargement.</div>';
+                        document.getElementById('reviewsContent').style.display = 'block';
+                        return;
+                    }
+                    document.getElementById('avgRating').textContent = json.avg_rating ? json.avg_rating : '—';
+                    document.getElementById('reviewsCount').textContent = json.count || 0;
+                    var list = document.getElementById('reviewsList');
+                    if ((json.reviews || []).length === 0) {
+                        list.innerHTML = '<div class="text-muted">Aucun avis pour le moment.</div>';
+                    } else {
+                        json.reviews.forEach(function (it) {
+                            var item = document.createElement('div');
+                            item.className = 'list-group-item';
+                            var name = (it.from_first ? it.from_first : 'Utilisateur');
+                            item.innerHTML = '<div class="d-flex justify-content-between align-items-start"><div><strong>' + escapeHTML(name) + '</strong> <small class="text-muted">' + escapeHTML(it.created_at) + '</small><div class="mt-2">' + escapeHTML(it.comment || '') + '</div></div><div class="text-end"><span class="badge bg-warning text-dark">' + (it.rating || 0) + '★</span></div></div>';
+                            list.appendChild(item);
+                        });
+                    }
+                    document.getElementById('reviewsContent').style.display = 'block';
+                }).catch(() => {
+                    document.getElementById('reviewsLoader').style.display = 'none';
+                    document.getElementById('reviewsContent').innerHTML = '<div class="text-danger">Erreur réseau.</div>';
+                    document.getElementById('reviewsContent').style.display = 'block';
+                });
+        }
+    });
 </script>
 
 <?php require_once 'includes/footer.php'; ?>

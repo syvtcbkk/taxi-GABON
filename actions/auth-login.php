@@ -8,6 +8,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ../login.php'); exit;
 }
 
+require_once __DIR__ . '/../includes/csrf.php';
+
+$csrf = $_POST['csrf_token'] ?? '';
+if (!verify_csrf($csrf)) {
+    $_SESSION['error'] = 'Requête invalide (token CSRF manquant ou incorrect).';
+    header('Location: ../login.php'); exit;
+}
+
 $identifiant = trim($_POST['identifiant'] ?? '');
 $password    = $_POST['password'] ?? '';
 

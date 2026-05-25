@@ -11,6 +11,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+require_once __DIR__ . '/../includes/csrf.php';
+$csrf = $_POST['csrf_token'] ?? '';
+if (!verify_csrf($csrf)) {
+    $_SESSION['error'] = 'Requête invalide (token CSRF manquant ou incorrect).';
+    header('Location: ../forgot-password.php');
+    exit;
+}
+
 $email = strtolower(trim($_POST['email'] ?? ''));
 
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {

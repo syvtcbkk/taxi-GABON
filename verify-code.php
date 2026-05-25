@@ -8,6 +8,11 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/header.php';
 
+// CSRF helper est inclus via header.php, mais on s'assure que la fonction existe
+if (!function_exists('verify_csrf')) {
+    require_once __DIR__ . '/includes/csrf.php';
+}
+
 // On s'assure que $pdo est bien accessible globalement
 global $pdo;
 
@@ -19,6 +24,10 @@ $success = $_SESSION['success'] ?? '';
 unset($_SESSION['success']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $csrf = $_POST['csrf_token'] ?? '';
+    if (!verify_csrf($csrf)) {
+        $error = 'Requête invalide (token CSRF manquant ou incorrect).';
+    } else {
     // On récupère les cases du code à 6 chiffres si elles sont séparées, ou le champ unique
     $codeSaisi = '';
     if (isset($_POST['code'])) {
@@ -27,13 +36,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $codeSaisi = implode('', $_POST['digit']);
     }
     
-    $codeSaisi = trim($codeSaisi);
+        $codeSaisi = trim($codeSaisi);
 
-    if (strlen($codeSaisi) !== 6) {
-        $error = "Veuillez entrer un code complet à 6 chiffres.";
-    } elseif (!isset($pdo) || $pdo === null) {
-        $error = "Erreur de connexion : Impossible d'accéder à la base de données.";
-    } else {
+        if (strlen($codeSaisi) !== 6) {
+            $error = "Veuillez entrer un code complet à 6 chiffres.";
+        } elseif (!isset($pdo) || $pdo === null) {
+            $error = "Erreur de connexion : Impossible d'accéder à la base de données.";
+        } else {
         try {
             // Recherche de l'utilisateur avec son code en cours de validité
             $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ? AND reset_code = ?");
@@ -50,9 +59,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             } else {
                 $error = "Code de vérification incorrect ou expiré. Veuillez réessayer.";
+                }
+            } catch (PDOException $e) {
+                $error = "Erreur technique système : " . $e->getMessage();
             }
-        } catch (PDOException $e) {
-            $error = "Erreur technique système : " . $e->getMessage();
         }
     }
 }
@@ -81,6 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
 
         <form action="verify-code.php" method="POST" class="mt-4">
+            <?php echo csrf_input(); ?>
             <div class="mb-4">
                 <label class="form-label text-muted small">Entrez le code à 6 chiffres reçu :</label>
                 <input type="text" name="code" class="form-control form-control-lg text-center fw-bold letter-spacing-2" 

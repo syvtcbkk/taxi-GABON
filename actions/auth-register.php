@@ -11,6 +11,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ../register.php'); exit;
 }
 
+require_once __DIR__ . '/../includes/csrf.php';
+
+$csrf = $_POST['csrf_token'] ?? '';
+if (!verify_csrf($csrf)) {
+    $_SESSION['error'] = 'Requête invalide (token CSRF manquant ou incorrect).';
+    header('Location: ../register.php'); exit;
+}
+
 $firstName = trim($_POST['first_name'] ?? '');
 $lastName  = trim($_POST['last_name']  ?? '');
 $email     = strtolower(trim($_POST['email'] ?? ''));

@@ -59,6 +59,7 @@ CREATE TABLE rides (
     cancel_reason   VARCHAR(255) DEFAULT NULL,
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     completed_at    DATETIME DEFAULT NULL,
+    stripe_session_id VARCHAR(191) DEFAULT NULL,
     FOREIGN KEY (passenger_id) REFERENCES users(id),
     FOREIGN KEY (driver_id)    REFERENCES users(id)
 ) ENGINE=InnoDB;
@@ -72,6 +73,21 @@ CREATE TABLE live_positions (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- Table des paiements Stripe pour idempotence et traçabilité
+CREATE TABLE payments (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    stripe_session_id   VARCHAR(191) NOT NULL UNIQUE,
+    passenger_id        INT NOT NULL,
+    amount              INT NOT NULL,
+    currency            VARCHAR(10) NOT NULL DEFAULT 'xaf',
+    status              ENUM('created','paid','failed') NOT NULL DEFAULT 'created',
+    metadata            JSON DEFAULT NULL,
+    ride_id             INT DEFAULT NULL,
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (passenger_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+
 -- Revenus journaliers (vue dénormalisée pour les graphiques)
 CREATE VIEW driver_daily_revenue AS
 SELECT
@@ -82,3 +98,17 @@ SELECT
 FROM rides
 WHERE status = 'completed' AND driver_id IS NOT NULL
 GROUP BY driver_id, DATE(completed_at);
+
+-- Reviews table: stocke avis entre utilisateurs après une course
+CREATE TABLE reviews (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ride_id INT NOT NULL,
+    from_user_id INT NOT NULL,
+    to_user_id INT NOT NULL,
+    rating TINYINT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    comment TEXT DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (ride_id) REFERENCES rides(id) ON DELETE CASCADE,
+    FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE
+ ) ENGINE=InnoDB;

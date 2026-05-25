@@ -9,6 +9,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ../reset-password.php'); exit;
 }
 
+require_once __DIR__ . '/../includes/csrf.php';
+$csrf = $_POST['csrf_token'] ?? '';
+if (!verify_csrf($csrf)) {
+    $_SESSION['error'] = 'Requête invalide (token CSRF manquant ou incorrect).';
+    header('Location: ../reset-password.php'); exit;
+}
+
 $email    = $_SESSION['reset_email'] ?? '';
 $code     = trim($_POST['code']     ?? '');
 $password = $_POST['password']      ?? '';
