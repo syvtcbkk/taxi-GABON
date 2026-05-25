@@ -1,7 +1,34 @@
 <?php 
 // Sécurisation du chemin d'inclusion de la base de données
 if (session_status() === PHP_SESSION_NONE) session_start();
+// Charger les variables d'environnement depuis .env si présent (vlucas/phpdotenv)
+if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+    if (file_exists(__DIR__ . '/../.env')) {
+        try {
+            $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
+            $dotenv->safeLoad();
+        } catch (Exception $e) {
+            // Ne pas interrompre l'application si dotenv manque ou échoue
+        }
+    }
+}
+
 require_once __DIR__ . '/db.php'; 
+// Logger (Monolog if available)
+require_once __DIR__ . '/logger.php';
+
+// Vérifier configuration Stripe et préparer un flag d'affichage convivial
+$stripe_missing = false;
+try {
+    require_once __DIR__ . '/payments.php';
+    if (!function_exists('stripe_secret') || !stripe_secret()) {
+        $stripe_missing = true;
+    }
+} catch (Throwable $e) {
+    // si l'inclusion échoue, on marque comme manquant mais on ne montre pas l'erreur technique
+    $stripe_missing = true;
+}
 // CSRF helper
 require_once __DIR__ . '/csrf.php';
 ?>
@@ -51,6 +78,13 @@ require_once __DIR__ . '/csrf.php';
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
             <?php unset($_SESSION['error']); ?>
+        <?php endif; ?>
+
+        <?php if (!empty($stripe_missing)): ?>
+            <div class="alert alert-warning rounded-3 shadow-sm border-0 mb-3" role="alert">
+                <i class="fa-solid fa-credit-card me-2"></i>
+                Paiements désactivés — Stripe non configuré. Contactez l'administrateur pour activer les paiements.
+            </div>
         <?php endif; ?>
 
         <?php if (isset($_SESSION['success'])): ?>

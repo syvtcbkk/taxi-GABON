@@ -79,6 +79,9 @@ try {
     header('Location: dashboard-passenger.php'); exit;
 
 } catch (Exception $e) {
-    $_SESSION['error'] = 'Erreur paiement: ' . $e->getMessage();
+    // Log technique côté serveur
+    try { logger()->error('[payment-success] ' . $e->getMessage()); } catch (Throwable $ex) { error_log('[payment-success] ' . $e->getMessage()); }
+    // Message non technique côté utilisateur
+    $_SESSION['error'] = 'Un problème est survenu lors de la confirmation du paiement. Si le problème persiste, contactez l\'administrateur.';
     header('Location: dashboard-passenger.php'); exit;
 }

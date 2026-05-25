@@ -649,10 +649,10 @@ $pendingRide = $pendingStmt->fetch();
                     // Rediriger vers Stripe Checkout
                     window.location.href = data.url;
                 } else {
-                    overlay.style.display = 'none';
                     alert(data.error || 'Erreur lors de la création de la session de paiement.');
                 }
             }).catch(() => { overlay.style.display = 'none'; alert('Erreur réseau.'); });
+            .finally(() => { try { overlay.style.display = 'none'; } catch(e){} });
     }
 
     // Review modal handling

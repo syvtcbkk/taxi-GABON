@@ -131,7 +131,11 @@ try {
     echo json_encode(['status' => 'ignored', 'type' => $type]);
     exit;
 } catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    // Log detailed error server-side for investigation
+    try { logger()->error('[stripe-webhook] ' . $e->getMessage()); } catch (Throwable $ex) { error_log('[stripe-webhook] ' . $e->getMessage()); }
+    // Return generic response to Stripe / caller
+    http_response_code(200);
+    // Respond with minimal info so Stripe will not retry endlessly; rely on logs for debugging
+    echo json_encode(['status' => 'error', 'message' => 'processed_with_issues']);
     exit;
 }

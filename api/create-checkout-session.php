@@ -63,6 +63,9 @@ try {
     echo json_encode(['success' => true, 'url' => $resp['url'], 'session_id' => $session_id]);
     exit;
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    // Log technical details server-side for debugging
+    try { logger()->error('[create-checkout-session] ' . $e->getMessage()); } catch (Throwable $ex) { error_log('[create-checkout-session] ' . $e->getMessage()); }
+    // Return a friendly, non-technical message to the client
+    echo json_encode(['success' => false, 'error' => 'Un problème est survenu lors du démarrage du paiement. Si le problème persiste, contactez l\'administrateur.']);
     exit;
 }

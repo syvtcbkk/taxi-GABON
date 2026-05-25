@@ -76,7 +76,11 @@ try {
     }
 
     $_SESSION['verify_email'] = $email;
-    $_SESSION['success'] = "Mode Développeur : Compte activé ! Le code généré pour ton test d'interface est : $verifyCode";
+    if ($isVerifiedLocal) {
+        $_SESSION['success'] = "Mode Développeur : Compte activé !";
+    } else {
+        $_SESSION['success'] = "Inscription réussie ! Vérifiez votre email pour le code de confirmation.";
+    }
 
     header('Location: ../verify-code.php');
     exit;

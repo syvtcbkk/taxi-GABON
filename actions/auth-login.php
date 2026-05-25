@@ -38,7 +38,9 @@ try {
         
         // Sécurité : On vérifie si le compte est actif
         if ((int)$user['is_verified'] !== 1) {
-            if (in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1'], true)) {
+            // Mode développement: bypass auto uniquement si env spécifié
+            $devMode = ($_ENV['DEV_MODE'] ?? 'false') === 'true';
+            if ($devMode && (in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1'], true))) {
                 $pdo->prepare('UPDATE users SET is_verified = 1 WHERE id = ?')->execute([$user['id']]);
                 $user['is_verified'] = 1;
             }
