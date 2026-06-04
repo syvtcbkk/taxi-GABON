@@ -46,7 +46,7 @@ if (!$event || empty($event['type'])) {
     $event_id = $data['id'] ?? null;
     if ($event_id) {
         try {
-            $event = stripe_post('/v1/events/' . rawurlencode($event_id));
+            $event = stripe_get('/v1/events/' . rawurlencode($event_id));
         } catch (Exception $e) {
             http_response_code(400);
             echo json_encode(['error' => 'Impossible de récupérer l\'événement']);

@@ -12,7 +12,7 @@ if (!$session_id) {
 
 try {
     // Récupérer la session
-    $session = stripe_post('/v1/checkout/sessions/' . rawurlencode($session_id), []);
+    $session = stripe_get('/v1/checkout/sessions/' . rawurlencode($session_id));
     if (($session['payment_status'] ?? '') !== 'paid') {
         $_SESSION['error'] = 'Paiement non confirmé.';
         header('Location: dashboard-passenger.php'); exit;

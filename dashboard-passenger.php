@@ -73,8 +73,8 @@ $pendingStmt->execute([$userId]);
 $pendingRide = $pendingStmt->fetch();
 ?>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css" onerror="this.onerror=null; this.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';" />
+<link rel="stylesheet" href="assets/vendor/leaflet-routing-machine/leaflet-routing-machine.css" onerror="this.onerror=null; this.href='https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css';" />
 
 <style>
     .suggestion-box {
@@ -385,8 +385,8 @@ $pendingRide = $pendingStmt->fetch();
     </div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+<script src="assets/vendor/leaflet/leaflet.js" onerror="this.onerror=null; this.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';"></script>
+<script src="assets/vendor/leaflet-routing-machine/leaflet-routing-machine.js" onerror="this.onerror=null; this.src='https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js';"></script>
 
 <script>
     const TARIF_BASE = 500;
@@ -643,15 +643,25 @@ $pendingRide = $pendingStmt->fetch();
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(rideEstimate)
             })
-            .then(r => r.json())
-            .then(data => {
+            .then(r => {
+                if (!r.ok) {
+                    throw new Error('Erreur serveur ' + r.status + ' ' + r.statusText);
+                }
+                return r.text();
+            })
+            .then(text => {
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (err) {
+                    throw new Error('Réponse invalide du serveur : ' + text);
+                }
                 if (data.success && data.url) {
-                    // Rediriger vers Stripe Checkout
                     window.location.href = data.url;
                 } else {
                     alert(data.error || 'Erreur lors de la création de la session de paiement.');
                 }
-            }).catch(() => { overlay.style.display = 'none'; alert('Erreur réseau.'); });
+            }).catch(err => { overlay.style.display = 'none'; alert(err.message || 'Erreur réseau.'); })
             .finally(() => { try { overlay.style.display = 'none'; } catch(e){} });
     }
 

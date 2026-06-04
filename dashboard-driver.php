@@ -74,7 +74,7 @@ $historyStmt->execute([$userId]);
 $driverHistory = $historyStmt->fetchAll();
 ?>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css" onerror="this.onerror=null; this.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <style>
@@ -354,7 +354,7 @@ $driverHistory = $historyStmt->fetchAll();
     </div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="assets/vendor/leaflet/leaflet.js" onerror="this.onerror=null; this.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';"></script>
 
 <script>
     // ── GRAPHIQUE REVENUS (Chart.js) ─────────────────────────────────────────────

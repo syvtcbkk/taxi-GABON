@@ -4,6 +4,11 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/payments.php';
 header('Content-Type: application/json');
+ini_set('display_errors', '0');
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
+set_error_handler(function ($severity, $message, $file, $line) {
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
 
 $sessionRole = $_SESSION['user_role'] ?? $_SESSION['role'] ?? null;
 if (!isset($_SESSION['user_id']) || $sessionRole !== 'passenger') {

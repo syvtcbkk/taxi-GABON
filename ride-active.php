@@ -30,7 +30,7 @@ if (!$ride) {
 }
 ?>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css" onerror="this.onerror=null; this.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';" />
 <style>
     .info-card { border-left: 5px solid #ffd700; }
     #rideMap { height: 380px; border-radius: 1rem; }
@@ -133,7 +133,7 @@ if (!$ride) {
     </div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="assets/vendor/leaflet/leaflet.js" onerror="this.onerror=null; this.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';"></script>
 <script>
     const map = L.map('rideMap').setView([<?= (float)($ride['origin_lat'] ?? 0.3924) ?>, <?= (float)($ride['origin_lng'] ?? 9.4536) ?>], 14);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
